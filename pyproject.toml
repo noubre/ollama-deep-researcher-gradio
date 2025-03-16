@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ollama-deep-researcher"
+version = "0.1.0"
+description = "A research assistant that uses Ollama local LLMs and web search to perform deep research on topics"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "LangChain AI", email = "info@langchain.dev"}
+]
+dependencies = [
+    "langgraph>=0.2.55",
+    "langchain-community>=0.3.9",
+    "tavily-python>=0.5.0",
+    "langchain-ollama>=0.2.1",
+    "duckduckgo-search>=7.3.0",
+    "beautifulsoup4>=4.13.3",
+    "gradio>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest",
+]
+
+[tool.setuptools]
+packages = ["src"]
