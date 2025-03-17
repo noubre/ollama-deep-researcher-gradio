@@ -11,7 +11,7 @@ A research assistant that uses Ollama local LLMs and web search to perform deep 
 ### Running with Gradio
 1. Clone the repository:
    ```bash
-   git clone https://github.com/langchain-ai/ollama-deep-researcher.git
+   git clone https://github.com/noubre/ollama-deep-researcher-gradio.git
    cd ollama-deep-researcher
    ```
 
