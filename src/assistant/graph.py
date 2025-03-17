@@ -51,65 +51,67 @@ def create_search_query(state: SummaryState, config: RunnableConfig):
     """Generate a search query based on the research topic and current state."""
     configurable = Configuration.from_runnable_config(config)
     
-    llm = ChatOllama(
+    print("Generating search query...")
+    
+    # Use JSON format to ensure structured output
+    llm_json = ChatOllama(
         model=configurable.local_llm,
         base_url=configurable.ollama_base_url,
+        temperature=0,
+        format="json"
     )
     
-    prompt_text = create_research_prompt(state, config)
-    # Create a HumanMessage from the prompt text
-    prompt_message = [HumanMessage(content=prompt_text)]
-    response = llm.invoke(prompt_message)
+    # Create system message from the instructions
+    system_message = SystemMessage(content=query_writer_instructions.format(research_topic=state["research_topic"]))
     
-    # Extract the content from the AIMessage
-    if hasattr(response, "content"):
-        raw_query = response.content
+    # If we have an existing summary, include it for context
+    if state.get("running_summary"):
+        human_content = f"Generate a targeted search query to expand on this summary:\n\n{state['running_summary']}"
     else:
-        raw_query = str(response)
+        human_content = f"Generate a targeted search query for this topic: {state['research_topic']}"
     
-    # Clean up the query - handle think tags, JSON formatting, and other issues
-    clean_query = raw_query.strip()
+    human_message = HumanMessage(content=human_content)
     
-    # Remove thinking process if enclosed in <think> tags
-    think_start = clean_query.find("<think>")
-    think_end = clean_query.find("</think>")
+    # Default fallback query in case something goes wrong
+    clean_query = f"information about {state['research_topic']}"
     
-    if think_start != -1 and think_end != -1 and think_end > think_start:
-        # Extract text after the thinking section
-        after_thinking = clean_query[think_end + 8:].strip()
-        if after_thinking:
-            clean_query = after_thinking
+    # Invoke the LLM with the formatted messages
+    try:
+        response = llm_json.invoke([system_message, human_message])
+        
+        # Extract content from response
+        if hasattr(response, "content"):
+            content = response.content
         else:
-            # If nothing after thinking, try to extract a concise version from within thinking
-            thinking_content = clean_query[think_start + 7:think_end].strip()
-            # Try to use the last paragraph or sentence as it might be more conclusive
-            paragraphs = thinking_content.split('\n\n')
-            if paragraphs:
-                clean_query = paragraphs[-1].strip()
-    
-    # Check if it's JSON formatted and extract the actual query
-    if clean_query.startswith('{') and clean_query.endswith('}'):
+            content = str(response)
+        
+        print(f"LLM response: {content[:50]}...")
+        
+        # Parse the JSON response
         try:
-            query_obj = json.loads(clean_query)
-            # Extract the query from common JSON formats
-            if 'q' in query_obj:
-                clean_query = query_obj['q']
-            elif 'query' in query_obj:
-                clean_query = query_obj['query']
-            elif 'searchQuery' in query_obj:
-                clean_query = query_obj['searchQuery']
+            import json
+            query_data = json.loads(content)
+            
+            # Extract the query from the JSON response
+            if "query" in query_data:
+                query = query_data["query"]
+                print(f"Query: {query}")
+                # Log additional information if available
+                if "aspect" in query_data:
+                    print(f"Aspect: {query_data['aspect']}")
+                if "rationale" in query_data:
+                    print(f"Rationale: {query_data['rationale'][:50]}...")
+                
+                return {"search_query": query}
         except json.JSONDecodeError as e:
-            print(f"JSON decode error in create_search_query: {e}")
-            print(f"Proceeding with original query string: {clean_query}")
-            # If it's not valid JSON, just use the cleaned string
-            pass
+            print(f"JSON error: {e}")
+            # Extract query from non-JSON response
+            clean_query = content.strip()
+    except Exception as e:
+        print(f"Error: {e}")
     
-    # If the query is too long, truncate it
-    if len(clean_query) > 500:
-        clean_query = clean_query[:497] + "..."
-    
-    print(f"Generated search query: {clean_query}")
-    
+    # Fallback if JSON parsing fails or any other error occurs
+    print(f"Using fallback: {clean_query}")
     return {"search_query": clean_query}
 
 def increment_research_count(state: SummaryState) -> SummaryState:
@@ -122,7 +124,7 @@ def web_research(state: SummaryState, config: RunnableConfig):
     configurable = Configuration.from_runnable_config(config)
 
     search_query = state["search_query"]
-    print(f"Web research query: {search_query}")
+    print(f"Query: {search_query}")
     
     # Increment the research loop count
     current_loop_count = state.get("research_loop_count", 0)
@@ -130,17 +132,15 @@ def web_research(state: SummaryState, config: RunnableConfig):
     
     search_api = configurable.search_api
 
-    print(f"Research loop count: {current_loop_count}/{configurable.max_web_research_loops}")
-    print(f"Using search API: {search_api}")
-
+    print(f"Loop {current_loop_count}/{configurable.max_web_research_loops}, using {search_api} API")
+    
     search_results = {}
     
     try:
         # Show which search API we're using
-        print(f"Searching with {search_api} API...")
+        print(f"Searching for: {search_query[:50]}...")
         
         if search_api == SearchAPI.TAVILY:
-            print(f"Executing Tavily search for: {search_query[:50]}...")
             search_results = tavily_search(
                 query=search_query,
                 api_key=configurable.tavily_api_key,
@@ -149,28 +149,25 @@ def web_research(state: SummaryState, config: RunnableConfig):
                 max_results=3
             )
         elif search_api == SearchAPI.PERPLEXITY:
-            print(f"Executing Perplexity search for: {search_query[:50]}...")
             search_results = perplexity_search(
                 query=search_query,
                 perplexity_search_loop_count=current_loop_count,
                 api_key=configurable.perplexity_api_key,
             )
         elif search_api == SearchAPI.DUCKDUCKGO:
-            print(f"Executing DuckDuckGo search for: {search_query[:50]}...")
             search_results = duckduckgo_search(
                 query=search_query,
                 fetch_full_page=configurable.fetch_full_page
             )
         else:
             # Default to DuckDuckGo if not specified
-            print(f"Using default DuckDuckGo search for: {search_query[:50]}...")
             search_results = duckduckgo_search(
                 query=search_query,
                 fetch_full_page=configurable.fetch_full_page
             )
             
         # Get formatted sources
-        print("Processing search results...")
+        print("Processing results...")
         formatted_sources = deduplicate_and_format_sources(search_results)
 
         # Get clean sources list for record-keeping
@@ -178,7 +175,7 @@ def web_research(state: SummaryState, config: RunnableConfig):
         
         # Show how many sources were found
         source_count = len(clean_sources) if clean_sources else 0
-        print(f"Found {source_count} relevant sources")
+        print(f"Found {source_count} sources")
         
         # Update research results
         web_research_results = state.get("web_research_results", [])
@@ -188,7 +185,7 @@ def web_research(state: SummaryState, config: RunnableConfig):
         sources_gathered = state.get("sources_gathered", [])
         sources_gathered.append(clean_sources)
         
-        print(f"Completed web research cycle {next_loop_count}")
+        print(f"Completed loop {next_loop_count}")
         
         # Return updated state
         return {
@@ -296,7 +293,7 @@ def should_continue_research(state: SummaryState, config: RunnableConfig) -> str
     # Get max loop count from config
     max_loops = configurable.max_web_research_loops
     
-    print(f"Research loop count: {current_loop_count}/{max_loops}")
+    print(f"Loop {current_loop_count}/{max_loops}")
     
     # Check if we've reached the maximum number of loops
     if current_loop_count >= max_loops:
@@ -309,7 +306,7 @@ def should_continue_research(state: SummaryState, config: RunnableConfig) -> str
 def summarize_sources(state: SummaryState, config: RunnableConfig):
     """ Summarize the gathered sources """
 
-    print("Starting to summarize research findings...")
+    print("Summarizing research findings...")
     
     # Existing summary
     existing_summary = state.get("running_summary")
@@ -319,7 +316,7 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
 
     # Build the human message
     if existing_summary:
-        print("Updating existing summary with new information...")
+        print("Updating existing summary...")
         human_message_content = (
             f"<User Input> \n {state['research_topic']} \n <User Input>\n\n"
             f"<Existing Summary> \n {existing_summary} \n <Existing Summary>\n\n"
@@ -350,13 +347,13 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
         end = running_summary.find("</think>") + len("</think>")
         running_summary = running_summary[:start] + running_summary[end:]
 
-    print("Summary generation complete")
+    print("Summary complete")
     return {"running_summary": running_summary}
 
 def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     """ Reflect on the summary and generate a follow-up query """
 
-    print("Reflecting on current summary to identify knowledge gaps...")
+    print("Identifying knowledge gaps...")
     
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
@@ -374,35 +371,42 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
         else:
             content = str(result)
             
-        print(f"Reflection result: {content}")
+        print(f"Reflection output: {content[:100]}...")
         
         try:
             import json
-            follow_up_query = json.loads(content)
+            reflection_data = json.loads(content)
             
-            # Get the follow-up query
-            query = follow_up_query.get('follow_up_query')
-            
-            # If query exists and is valid, use it
-            if query and isinstance(query, str) and len(query.strip()) > 0:
-                print(f"Generated follow-up query: {query}")
+            # Get the follow-up query from the new JSON structure
+            if "follow_up_query" in reflection_data:
+                query = reflection_data["follow_up_query"]
+                print(f"Next query: {query}")
                 return {"search_query": query}
+            elif "query" in reflection_data:
+                query = reflection_data["query"]
+                print(f"Next query: {query}")
+                if "aspect" in reflection_data:
+                    print(f"Aspect: {reflection_data['aspect']}")
+                if "rationale" in reflection_data:
+                    print(f"Rationale: {reflection_data['rationale']}")
+                return {"search_query": query}
+            else:
+                print("No valid query found")
                 
         except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}")
-            print(f"Raw content: {content}")
+            print(f"JSON error: {e}")
     except Exception as e:
-        print(f"Error in reflection: {e}")
+        print(f"Error: {e}")
     
     # Fallback to a placeholder query
     fallback_query = f"Tell me more about {state['research_topic']}"
-    print(f"Using fallback query: {fallback_query}")
+    print(f"Using fallback: {fallback_query}")
     return {"search_query": fallback_query}
 
 def finalize_summary(state: SummaryState):
     """ Finalize the summary """
 
-    print("Finalizing research summary...")
+    print("Finalizing summary...")
     
     # Format all accumulated sources into a single bulleted list
     all_sources = []
@@ -413,7 +417,7 @@ def finalize_summary(state: SummaryState):
     
     sources_formatted = "\n".join(all_sources) if all_sources else "No sources gathered."
     
-    print("Research process complete!")
+    print("Research complete!")
     return {"running_summary": f"## Summary\n\n{state['running_summary']}\n\n### Sources:\n{sources_formatted}"}
 
 def route_research(state: SummaryState, config: RunnableConfig) -> str:
@@ -423,7 +427,7 @@ def route_research(state: SummaryState, config: RunnableConfig) -> str:
     current_count = state["research_loop_count"]
     max_loops = configurable.max_web_research_loops
     
-    print(f"Research loop count: {current_count}/{max_loops}")
+    print(f"Loop {current_count}/{max_loops}")
     
     if current_count >= max_loops:
         print("Reached maximum number of research loops. Proceeding to finalize summary.")

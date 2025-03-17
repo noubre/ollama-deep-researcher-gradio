@@ -3,60 +3,81 @@ This module contains the prompt instructions used by different components of the
 """
 
 # Instructions for query generation
-query_writer_instructions = """
-You are a precise search query generator. Your task is to create focused search queries that will help gather relevant information on the given research topic.
+query_writer_instructions = """Your goal is to generate a targeted web search query.
+The query will gather information related to a specific topic.
 
-CRITICAL INSTRUCTIONS - FOLLOW EXACTLY:
-1. Generate ONLY a short web search query (5-10 words max)
-2. DO NOT include any explanations, instructions, or contextual information
-3. DO NOT use quotation marks or special formatting
-4. DO NOT create a list of multiple queries
-5. DO NOT phrase it as a question
-6. ENSURE it is specific and factual
-7. FOCUS on the most important aspects of the topic
+<TOPIC>
+{research_topic}
+</TOPIC>
 
-EXAMPLE GOOD QUERIES:
-- quantum physics entanglement experiments
-- climate change global temperature data
-- artificial intelligence neural networks history
+<FORMAT>
+Format your response as a JSON object with ALL three of these exact keys:
+   - "query": The actual search query string
+   - "aspect": The specific aspect of the topic being researched
+   - "rationale": Brief explanation of why this query is relevant
+</FORMAT>
 
-EXAMPLE BAD QUERIES:
-- "What are the main principles of quantum physics?"
-- To find information about quantum physics, search for...
-- Search for articles discussing quantum physics and related topics
+<EXAMPLE>
+Example output:
+{{
+    "query": "machine learning transformer architecture explained",
+    "aspect": "technical architecture",
+    "rationale": "Understanding the fundamental structure of transformer models"
+}}
+</EXAMPLE>
 
-Output ONLY the search query text - nothing else.
-"""
+Provide your response in JSON format:"""
 
 # Instructions for summarizing search results
-summarizer_instructions = """
-You are a research assistant that creates comprehensive, well-structured summaries.
+summarizer_instructions = """<GOAL>
+Generate a high-quality summary of the web search results and keep it concise / related to the user topic.
+</GOAL>
 
-Follow these guidelines:
-1. Create a detailed, informative summary that synthesizes the information from all sources
-2. Organize the information logically with clear structure
-3. Include specific facts, data, and key concepts
-4. Maintain a neutral, informative tone
-5. Use markdown formatting for structure: headings, bullet points, etc.
-6. Do not reference the source numbers or URLs in your summary
-7. The summary should be comprehensive yet concise
+<REQUIREMENTS>
+When creating a NEW summary:
+1. Highlight the most relevant information related to the user topic from the search results
+2. Ensure a coherent flow of information
 
-Important: Do not hallucinate or include information not present in the sources.
-"""
+When EXTENDING an existing summary:
+1. Read the existing summary and new search results carefully.
+2. Compare the new information with the existing summary.
+3. For each piece of new information:
+   a. If it's related to existing points, integrate it into the relevant paragraph.
+   b. If it's entirely new but relevant, add a new paragraph with a smooth transition.
+   c. If it's not relevant to the user topic, skip it.
+4. Ensure all additions are relevant to the user's topic.
+5. Verify that your final output differs from the input summary.
+</REQUIREMENTS>
+
+<FORMATTING>
+- Start directly with the updated summary, without preamble or titles. Do not use XML tags in the output.
+</FORMATTING>"""
 
 # Instructions for generating reflection and follow-up queries
-reflection_instructions = """
-You are a research assistant analyzing a summary on the topic: {research_topic}.
+reflection_instructions = """You are an expert research assistant analyzing a summary about {research_topic}.
 
-Your task is to:
-1. Identify knowledge gaps in the current summary
-2. Generate a targeted follow-up search query to find additional information
+<GOAL>
+1. Identify knowledge gaps or areas that need deeper exploration
+2. Generate a follow-up question that would help expand your understanding
+3. Focus on technical details, implementation specifics, or emerging trends that weren't fully covered
+</GOAL>
 
-Return your response in this JSON format:
+<REQUIREMENTS>
+Ensure the follow-up question is self-contained and includes necessary context for web search.
+</REQUIREMENTS>
+
+<FORMAT>
+Format your response as a JSON object with these exact keys:
+- knowledge_gap: Describe what information is missing or needs clarification
+- follow_up_query: Write a specific question to address this gap
+</FORMAT>
+
+<EXAMPLE>
+Example output:
 {{
-  "analysis": "Brief analysis of knowledge gaps (1-2 sentences)",
-  "follow_up_query": "Your follow-up search query (2-8 words)"
+    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks",
+    "follow_up_query": "What are typical performance benchmarks and metrics used to evaluate [specific technology]?"
 }}
+</EXAMPLE>
 
-Keep your follow-up query focused and specific to maximize the relevance of search results.
-"""
+Provide your analysis in JSON format:"""
