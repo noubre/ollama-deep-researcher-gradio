@@ -51,6 +51,7 @@ A research assistant that uses Ollama local LLMs and web search to perform deep 
 ### Tavily
 - Requires an API key (get one at [tavily.com](https://tavily.com))
 - Provides high-quality search results with content extraction
+- Improved query processing to handle complex queries efficiently
 
 ### Perplexity
 - Requires an API key (get one at [perplexity.ai](https://perplexity.ai))
@@ -61,6 +62,18 @@ A research assistant that uses Ollama local LLMs and web search to perform deep 
 - Performs iterative research to gather comprehensive information
 - Creates well-structured, detailed summaries in markdown format
 - Fully configurable parameters for customized research experience
+- Real-time status updates during the research process
+- Enhanced error handling with helpful error messages
+- Improved UI with a modern and responsive design
+- Advanced settings tucked away in a collapsible section
+
+## 🧩 Recent Improvements
+- **Enhanced Visual Feedback**: Real-time status updates show the progress of your research
+- **Smarter Query Generation**: JSON-structured prompts ensure more focused and effective searches
+- **Improved Error Handling**: Better error messages and recovery mechanisms
+- **Streamlined UI**: Cleaner interface with advanced settings in a collapsible section
+- **Enhanced Search Query Generation**: More concise and relevant search queries
+- **Better Source Formatting**: Improved formatting of source citations in the final summary
 
 ## 🧠 How It Works
 1. The system generates an initial search query from your research topic
@@ -76,3 +89,21 @@ This project is built on:
 - LangChain for LLM integration
 - Ollama for local LLM inference
 - Gradio for the web interface
+
+## 🔧 Configuration
+You can configure the application using environment variables in a `.env` file:
+
+```
+# API Keys
+TAVILY_API_KEY=your_tavily_api_key
+PERPLEXITY_API_KEY=your_perplexity_api_key
+
+# Default Settings
+MAX_WEB_RESEARCH_LOOPS=3
+SEARCH_API=duckduckgo
+FETCH_FULL_PAGE=False
+OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://localhost:11434/
+```
+
+These settings can also be adjusted through the web interface.
