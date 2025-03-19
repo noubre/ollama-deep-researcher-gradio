@@ -1,6 +1,8 @@
 # Ollama Deep Researcher
 
-A research assistant that uses Ollama local LLMs and web search to perform deep research on topics. This implementation uses Gradio for a user-friendly web interface and removes Docker dependencies for simpler setup.
+A research assistant that uses Ollama local LLMs and web search to perform deep research on topics. This implementation uses Gradio for a user-friendly web interface.
+
+Based on [Ollama Deep Researcher](https://github.com/langchain-ai/ollama-deep-researcher).
 
 ## 🚀 Quickstart
 
@@ -12,7 +14,7 @@ A research assistant that uses Ollama local LLMs and web search to perform deep 
 1. Clone the repository:
    ```bash
    git clone https://github.com/noubre/ollama-deep-researcher-gradio.git
-   cd ollama-deep-researcher
+   cd ollama-deep-researcher-gradio
    ```
 
 2. (Recommended) Create a virtual environment:
@@ -102,8 +104,11 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 MAX_WEB_RESEARCH_LOOPS=3
 SEARCH_API=duckduckgo
 FETCH_FULL_PAGE=False
-OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL=deepseek-r1:8b
 OLLAMA_BASE_URL=http://localhost:11434/
 ```
 
 These settings can also be adjusted through the web interface.
+
+## 📝 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
